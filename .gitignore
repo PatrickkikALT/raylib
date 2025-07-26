@@ -406,9 +406,3 @@ Makefile
 *.swo
 *.swn
 /.vscode
-build-MinGW-W64.bat
-build-VisualStudio2022.bat
-build/premake5
-build/premake5.exe
-build/premake5.lua
-build/premake5.osx
