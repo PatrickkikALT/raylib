@@ -215,11 +215,13 @@ int main() {
 
     Vector3 oldPosition = camera.position;
 
-    if (IsKeyDown(KEY_W)) camera.position = Vector3Add(camera.position, Vector3Scale(forward, 10 * deltaTime));
-    if (IsKeyDown(KEY_S)) camera.position = Vector3Subtract(camera.position, Vector3Scale(forward, 10 * deltaTime));
-    if (IsKeyDown(KEY_A)) camera.position = Vector3Subtract(camera.position, Vector3Scale(right, 10 * deltaTime));
-    if (IsKeyDown(KEY_D)) camera.position = Vector3Add(camera.position, Vector3Scale(right, 10 * deltaTime));
-
+    Vector3 newPosition = camera.position;
+    if (IsKeyDown(KEY_W)) newPosition = Vector3Add(camera.position, Vector3Scale(forward, 10 * deltaTime));
+    if (IsKeyDown(KEY_S)) newPosition = Vector3Subtract(camera.position, Vector3Scale(forward, 10 * deltaTime));
+    if (IsKeyDown(KEY_A)) newPosition = Vector3Subtract(camera.position, Vector3Scale(right, 10 * deltaTime));
+    if (IsKeyDown(KEY_D)) newPosition = Vector3Add(camera.position, Vector3Scale(right, 10 * deltaTime));
+    newPosition.y = oldPosition.y;
+    camera.position = newPosition;
 
 
     Vector3 testPos = camera.position;
@@ -228,7 +230,12 @@ int main() {
     int tz = (int)testPos.z;
     if (tx >= 0 && tx < WORLD_SIZE && ty >= 0 && ty < MAX_HEIGHT && tz >= 0 && tz < WORLD_SIZE) {
       if (solid[tx][ty][tz]) {
-        camera.position = oldPosition;
+        if (ty + 1 < MAX_HEIGHT && !solid[tx][ty + 1][tz]) {
+          camera.position.y = (float)(ty + 1) + 1.4f;
+        }
+        else {
+          camera.position = oldPosition;
+        }
       }
     }
     camera.target = Vector3Add(camera.position, forward);
