@@ -92,11 +92,6 @@ void RebuildBlocks() {
     }
   }
 }
-//c++ is stupid and doesnt allow me to do Color == Color????
-//wtf is wrong with this language
-bool ColorEquals(Color a, Color b) {
-  return a.r == b.r && a.g == b.g && a.b == b.b && a.a == b.a;
-}
 
 int main() {
   InitWindow(800, 600, "minecraft");
@@ -106,7 +101,7 @@ int main() {
   Texture dirtTexture = LoadTexture("resources/dirt.png");
   Model cubeModel = LoadModelFromMesh(cubeMesh);
   DisableCursor();
-  SetTargetFPS(60);
+  SetTargetFPS(240);
   
   Camera3D camera = { 0 };
   camera.position = { 40.0f, 30.0f, 40.0f };
@@ -128,10 +123,10 @@ int main() {
     BeginMode3D(camera);
 
     for (const Block& block : blocks) {
-      if (ColorEquals(block.color, GREEN)) {
+      if (ColorIsEqual(block.color, GREEN)) {
         cubeModel.materials[0].maps[0].texture = grassTexture;
       }
-      else if (ColorEquals(block.color, BROWN)) {
+      else if (ColorIsEqual(block.color, BROWN)) {
         cubeModel.materials[0].maps[0].texture = dirtTexture;
       }
       else {
