@@ -3,6 +3,7 @@
 #include <vector>
 #include <cmath>
 #include <raymath.h>
+#include <limits>
 
 const int WORLD_SIZE = 64;
 const int MAX_HEIGHT = 20;
@@ -95,11 +96,12 @@ void RebuildBlocks() {
 
 int main() {
   InitWindow(800, 600, "minecraft");
-
-  Mesh cubeMesh = GenMeshCube(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
-  Texture grassTexture = LoadTexture("resources/grass.png");
+  Vector2 center = { GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
+  Model cubeModel = LoadModel("resources/cube.obj");
+  Mesh cubeMesh = cubeModel.meshes[0];
+  Texture grassTexture = LoadTexture("resources/grassblock.png");
   Texture dirtTexture = LoadTexture("resources/dirt.png");
-  Model cubeModel = LoadModelFromMesh(cubeMesh);
+  Texture bedrockTexture = LoadTexture("resources/bedrock.png");
   DisableCursor();
   SetTargetFPS(240);
   
@@ -124,20 +126,44 @@ int main() {
 
     for (const Block& block : blocks) {
       if (ColorIsEqual(block.color, GREEN)) {
-        cubeModel.materials[0].maps[0].texture = grassTexture;
+        cubeModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = grassTexture;
       }
       else if (ColorIsEqual(block.color, BROWN)) {
         cubeModel.materials[0].maps[0].texture = dirtTexture;
       }
       else {
-        cubeModel.materials[0].maps[0].texture = { 0 };
+        cubeModel.materials[0].maps[0].texture = bedrockTexture;
       }
       DrawModel(cubeModel, block.position, 1.0f, GRAY);
     }
+    
+    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+      Ray ray = GetMouseRay(center, camera);
+      DrawLine3D(ray.position, Vector3Add(ray.position, Vector3Scale(ray.direction, 100)), GREEN);
+      float closestDist = std::numeric_limits<float>::max();
+      int selected = -1;
 
-    Ray ray = GetMouseRay(GetMousePosition(), camera);
-    float closestDist = 1000.0f;
-    Vector3 hitBlock = { 0 };
+      for (int i = 0; i < blocks.size(); i++) {
+        Vector3 pos = blocks[i].position;
+
+        BoundingBox box;
+        box.min = { pos.x - 0.5f, pos.y - 0.5f, pos.z - 0.5f };
+        box.max = { pos.x + 0.5f, pos.y + 0.5f, pos.z + 0.5f };
+        RayCollision hit = GetRayCollisionBox(ray, box);
+        if (hit.hit && hit.distance < closestDist) {
+          closestDist = hit.distance;
+          selected = i;
+          
+        }
+      }
+      printf("%d\n", selected);
+      if (selected >= 0) {
+        Vector3 pos = blocks[selected].position;
+        solid[pos.x][pos.y][pos.z] = false;
+        RebuildBlocks();
+      }
+    }
+    
 
 
     EndMode3D();
