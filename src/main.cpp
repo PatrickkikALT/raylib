@@ -13,10 +13,12 @@ const float BLOCK_SIZE = 1.0f;
 const float GRAVITY = 9.8f;
 
 bool generatedTerrain = false;
-
+Texture grassTexture;
+Texture dirtTexture;
+Texture bedrockTexture;
 struct Block {
   Vector3 position;
-  Color color;
+  Texture texture;
 };
 
 std::vector<Block> blocks;
@@ -57,11 +59,11 @@ void GenerateTerrain() {
         block.position = { (float)x, (float)y, (float)z };
 
         if (y == MAX_HEIGHT - 1 || (y + 1 < MAX_HEIGHT && !solid[x][y + 1][z]))
-          block.color = GREEN;
+          block.texture = grassTexture;
         else if (y > 1)
-          block.color = BROWN;
+          block.texture = dirtTexture;
         else
-          block.color = DARKGRAY;
+          block.texture = bedrockTexture;
 
         blocks.push_back(block);
       }
@@ -73,8 +75,23 @@ void GenerateTerrain() {
 void RebuildBlocks() {
   blocks.clear();
 
+  std::vector<int> topBlockY(WORLD_SIZE * WORLD_SIZE, 0);
+
   for (int x = 0; x < WORLD_SIZE; x++) {
     for (int z = 0; z < WORLD_SIZE; z++) {
+      for (int y = MAX_HEIGHT - 1; y >= 0; y--) {
+        if (solid[x][y][z]) {
+          topBlockY[x * WORLD_SIZE + z] = y;
+          break;
+        }
+      }
+    }
+  }
+
+  for (int x = 0; x < WORLD_SIZE; x++) {
+    for (int z = 0; z < WORLD_SIZE; z++) {
+      int surfaceY = topBlockY[x * WORLD_SIZE + z];
+
       for (int y = 0; y < MAX_HEIGHT; y++) {
         if (!solid[x][y][z]) continue;
         if (!IsExposed(x, y, z, solid)) continue;
@@ -82,12 +99,15 @@ void RebuildBlocks() {
         Block block;
         block.position = { (float)x, (float)y, (float)z };
 
-        if (y == MAX_HEIGHT - 1 || (y + 1 < MAX_HEIGHT && !solid[x][y + 1][z]))
-          block.color = GREEN;
-        else if (y > 1)
-          block.color = BROWN;
-        else
-          block.color = DARKGRAY;
+        if (y == surfaceY) {
+          block.texture = grassTexture;
+        }
+        else if (y > 1) {
+          block.texture = dirtTexture;
+        }
+        else {
+          block.texture = bedrockTexture;
+        }
 
         blocks.push_back(block);
       }
@@ -95,14 +115,15 @@ void RebuildBlocks() {
   }
 }
 
+
 int main() {
   InitWindow(800, 600, "minecraft");
   Vector2 center = { GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
   Model cubeModel = LoadModel("resources/cube.obj");
   Mesh cubeMesh = cubeModel.meshes[0];
-  Texture grassTexture = LoadTexture("resources/grassblock.png");
-  Texture dirtTexture = LoadTexture("resources/dirt.png");
-  Texture bedrockTexture = LoadTexture("resources/bedrock.png");
+  grassTexture = LoadTexture("resources/grassblock.png");
+  dirtTexture = LoadTexture("resources/dirt.png");
+  bedrockTexture = LoadTexture("resources/bedrock.png");
   DisableCursor();
   SetTargetFPS(240);
   
@@ -112,7 +133,7 @@ int main() {
   camera.up = { 0.0f, 1.0f, 0.0f };
   camera.fovy = 45.0f;
   camera.projection = CAMERA_PERSPECTIVE;
-
+  BoundingBox player;
   float yaw = 0;
   float pitch = 0;
 
@@ -127,130 +148,17 @@ int main() {
     ClearBackground(SKYBLUE);
     DrawFPS(10, 30);
     BeginMode3D(camera);
+    UpdateCamera(&camera, CAMERA_FIRST_PERSON);
 
-    float deltaTime = GetFrameTime();
-    
-    playerVelocity -= GRAVITY * deltaTime;
-
-    if (grounded && IsKeyPressed(KEY_SPACE)) {
-      playerVelocity = -6.0f;
-      grounded = false;
+    if (IsKeyDown(KEY_LEFT_CONTROL)) {
+      camera.position.y -= 0.1f;
     }
-
-    Vector3 nextPos = camera.position;
-    nextPos.y -= playerVelocity * deltaTime;
-
-    int nx = (int)nextPos.x;
-    int ny = (int)(nextPos.y - 1.0f);
-    int nz = (int)nextPos.z;
-
-    if (nx >= 0 && nx < WORLD_SIZE && ny >= 0 && ny < MAX_HEIGHT && nz >= 0 && nz < WORLD_SIZE) {
-      if (!solid[nx][ny][nz]) {
-        camera.position.y = nextPos.y;
-        grounded = false;
-      }
-      else {
-        grounded = true;
-        playerVelocity = 0;
-        camera.position.y = ny + 1.0f;
-      }
+    if (IsKeyDown(KEY_SPACE)) {
+      camera.position.y += 0.1f;
     }
-
-
-    //ground check
-    Ray ray = { camera.position, { 0.0f, 1.0f, 0.0f} };
-    ray.direction = Vector3{ 0.0f, -1.0f, 0.0f };
-
-    float closestDist = FLT_MAX;
-    Vector3 groundPos = { 0 };
-
-    //bad for performance
-    //for (Block& block : blocks) {
-    //  RayCollision hit = GetRayCollisionMesh(ray, cubeMesh, MatrixTranslate(block.position.x, block.position.y, block.position.z));
-    //  if (hit.hit && hit.distance < closestDist) {
-    //    closestDist = hit.distance;
-    //    groundPos = hit.point;
-    //  }
-    //}
-    Vector3 camPos = camera.position;
-    int x = (int)camPos.x;
-    int z = (int)camPos.z;
-
-    for (int y = (int)camPos.y; y >= 0; y--) {
-      if (x >= 0 && x < WORLD_SIZE && y < MAX_HEIGHT && z >= 0 && z < WORLD_SIZE) {
-        if (solid[x][y][z]) {
-          groundPos.y = y + 1.4f;
-          break;
-        }
-      }
-    }
-
-    camera.position.y += playerVelocity * deltaTime;
-    //apply gravity
-    if (camera.position.y >= groundPos.y + 1.4f) {
-      camera.position.y -= GRAVITY * deltaTime;
-    }
-
-    //mouse movement
-
-    Vector2 delta = GetMouseDelta();
-    yaw -= delta.x * 0.002f;
-    pitch -= delta.y * 0.002f;
-    if (pitch > 89.0f * DEG2RAD) pitch = 89.0f * DEG2RAD;
-    if (pitch < -89.0f * DEG2RAD) pitch = -89.0f * DEG2RAD;
-
-    //movement
-    Vector3 forward = {
-      cosf(pitch) * sinf(yaw),
-      sinf(pitch),
-      cosf(pitch) * cosf(yaw)
-    };
-    Vector3 right = {
-      sinf(yaw - PI / 2.0f),
-      0.0f,
-      cosf(yaw - PI / 2.0f)
-    };
-
-    Vector3 up = Vector3CrossProduct(right, forward);
-
-    Vector3 oldPosition = camera.position;
-
-    Vector3 newPosition = camera.position;
-    if (IsKeyDown(KEY_W)) newPosition = Vector3Add(camera.position, Vector3Scale(forward, 10 * deltaTime));
-    if (IsKeyDown(KEY_S)) newPosition = Vector3Subtract(camera.position, Vector3Scale(forward, 10 * deltaTime));
-    if (IsKeyDown(KEY_A)) newPosition = Vector3Subtract(camera.position, Vector3Scale(right, 10 * deltaTime));
-    if (IsKeyDown(KEY_D)) newPosition = Vector3Add(camera.position, Vector3Scale(right, 10 * deltaTime));
-    newPosition.y = oldPosition.y;
-    camera.position = newPosition;
-
-
-    Vector3 testPos = camera.position;
-    int tx = (int)testPos.x;
-    int ty = (int)(testPos.y - 1.0f);
-    int tz = (int)testPos.z;
-    if (tx >= 0 && tx < WORLD_SIZE && ty >= 0 && ty < MAX_HEIGHT && tz >= 0 && tz < WORLD_SIZE) {
-      if (solid[tx][ty][tz]) {
-        if (ty + 1 < MAX_HEIGHT && !solid[tx][ty + 1][tz]) {
-          camera.position.y = (float)(ty + 1) + 1.4f;
-        }
-        else {
-          camera.position = oldPosition;
-        }
-      }
-    }
-    camera.target = Vector3Add(camera.position, forward);
-    camera.up = up;
 
     for (const Block& block : blocks) {
-      if (ColorIsEqual(block.color, GREEN)) {
-        cubeModel.materials[0].maps[MATERIAL_MAP_DIFFUSE].texture = grassTexture;
-      }
-      else if (ColorIsEqual(block.color, BROWN)) {
-        cubeModel.materials[0].maps[0].texture = dirtTexture;
-      }
-      else {
-        cubeModel.materials[0].maps[0].texture = bedrockTexture;
-      }
+      cubeModel.materials[0].maps[0].texture = block.texture;
       DrawModel(cubeModel, block.position, 1.0f, GRAY);
     }
     
@@ -270,7 +178,6 @@ int main() {
         if (hit.hit && hit.distance < closestDist) {
           closestDist = hit.distance;
           selected = i;
-          
         }
       }
       if (selected >= 0) {
@@ -282,6 +189,8 @@ int main() {
     
     EndMode3D();
     DrawText("WASD + mouse to move", 10, 10, 20, BLACK);
+    DrawText(TextFormat("Current velocity: %0.2f", playerVelocity), 10, 50, 20, BLACK);
+    DrawText(TextFormat("Grounded: %d", (int)grounded), 10, 70, 20, BLACK);
     EndDrawing();
   }
 
